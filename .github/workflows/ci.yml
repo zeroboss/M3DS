@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: m3ds
+          POSTGRES_PASSWORD: m3ds
+          POSTGRES_DB: m3ds
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U m3ds" --health-interval 2s --health-retries 20
+    env:
+      M3DS_DATABASE_URL: postgresql+asyncpg://m3ds:m3ds@localhost:5432/m3ds
+      M3DS_TEST_DATABASE_URL: postgresql+asyncpg://m3ds:m3ds@localhost:5432/m3ds
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - name: Migrations apply cleanly and match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+          uv run alembic downgrade base
+      - run: uv run pytest -m "not live"

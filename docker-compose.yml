@@ -1,0 +1,28 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: m3ds
+      POSTGRES_PASSWORD: m3ds
+      POSTGRES_DB: m3ds
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U m3ds"]
+      interval: 2s
+      retries: 20
+
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      M3DS_DATABASE_URL: postgresql+asyncpg://m3ds:m3ds@db:5432/m3ds
+      M3DS_AUTO_CREATE_SCHEMA: "false"
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  pgdata:

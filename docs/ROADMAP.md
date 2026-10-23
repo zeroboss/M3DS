@@ -4,17 +4,32 @@ Durations assume 1–2 engineers and are indicative. Each phase ends with
 something usable and an evaluation that proves it works across at least two
 LLM providers.
 
-## Phase 0 — Foundations (≈2 weeks)
+## Phase 0 — Foundations (≈2 weeks) — ✅ built; live check pending API keys
 
-- Repo scaffolding: `uv`, ruff, pyright, pytest, pre-commit, CI.
-- Docker Compose: Postgres + pgvector, API, worker, Langfuse.
-- Canonical message/request/response models; `LLMProvider` protocol.
-- Adapters: **Anthropic, OpenAI, Google Gemini** (generate, stream, structured output, tools).
-- Model capability registry + config-driven routing and fallback.
-- Minimal chat endpoint + CLI client with session history.
-- Tracing of every LLM call (tokens, cost, latency).
+- [x] Repo scaffolding: `uv`, ruff, pyright, pytest, pre-commit, CI (GitHub Actions with Postgres).
+- [x] Docker Compose: Postgres + pgvector and the API. The background worker arrives with
+      Phase 1, its first user; Langfuse (or any OTLP backend) is connected through
+      `OTEL_EXPORTER_OTLP_ENDPOINT` rather than bundled.
+- [x] Canonical message/request/response models; `LLMProvider` interface.
+- [x] Adapters: **Anthropic** (Messages API, prompt caching, effort, server-side refusal
+      fallback), **OpenAI** (stateless Responses API with encrypted reasoning replay),
+      **Google Gemini** (`google-genai`, thought-signature replay) — generate, stream,
+      structured output, tools.
+- [x] Model capability registry (`config/models.yaml`) + config-driven routing and fallback.
+- [x] Chat endpoint (REST + SSE) and CLI client with persistent session history.
+- [x] Tracing of every LLM call (tokens, cost, latency) to the database and OpenTelemetry.
 
-**Exit:** the same conversation runs on Claude, GPT and Gemini by changing one config value.
+**Exit:** the same conversation runs on Claude, GPT and Gemini by changing one config
+value — and can switch provider mid-conversation, including in the middle of a tool
+exchange. Covered offline by the adapter mapping tests; the end-to-end check against the
+real APIs is `tests/test_live.py` (`uv run pytest -m live`), still to be run with keys.
+
+**Design notes carried into Phase 1**
+- Provider-native content (thinking blocks, encrypted reasoning, thought signatures) is
+  stored next to the portable parts and replayed only to the provider that produced it.
+- History is append-only. Per-turn context (memories, retrieved knowledge) should be
+  added after the stable, cacheable prefix instead of rewriting earlier turns, which keeps
+  prompt caches warm and satisfies providers that validate replayed reasoning.
 
 ## Phase 1 — Memory (≈3 weeks)
 
